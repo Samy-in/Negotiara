@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model NegotiationSession {
+  id               String   @id @default(uuid())
+  shipmentContext  String
+  marketBenchmark  Float
+  targetPrice      Float
+  reservationPrice Float
+  competitorPrices Float[]
+  initialLspOffer  Float?
+  maxRounds        Int      @default(4)
+  status           String   @default("active") // active, closed, walk_away
+  agreedPrice      Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  messages         Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  sessionId String
+  role      String   // AI or LSP
+  content   String
+  price     Float?
+  strategy  String?
+  reasoning String?
+  createdAt DateTime @default(now())
+
+  session   NegotiationSession @relation(fields: [sessionId], references: [id])
+}
