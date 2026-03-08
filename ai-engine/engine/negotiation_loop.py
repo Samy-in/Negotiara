@@ -1,108 +1,136 @@
-from agents.master_negotiator import MasterNegotiator
-from agents.lsp_agent import LspAgent
-from intelligence.negotiation_memory import NegotiationMemory
-from strategy.anchoring import calculate_anchor
-from .decision_engine import evaluate_round_outcome
+from agents.dual_agent import NegotiationAgent
+from strategy.concession import calculate_concession, is_deal_acceptable
 import json
 import re
 
-def execute_negotiation(shipment_context: str, 
-                        market_benchmark: float, 
-                        target_price: float, 
-                        reservation_price: float, 
-                        competitor_prices: list[float], 
-                        initial_lsp_offer: float = None,
-                        max_rounds: int = 4) -> dict:
-                            
-    master = MasterNegotiator()
-    lsp = LspAgent()
-    memory = NegotiationMemory()
+from agents.dual_agent import NegotiationAgent
+from strategy.concession import calculate_concession
+from intelligence.pricing import IntrinsicValueModel
+from intelligence.utility import UtilityEvaluator
+from intelligence.market import MarketSignalMonitor
+from intelligence.retrieval import SimpleRAGService
+import json
+
+def execute_negotiation(context: dict, max_rounds: int = 5) -> dict:
+    """
+    Advanced Negotiation Loop:
+    1. Load Context
+    2. Retrieve Similar Deals (RAG)
+    3. Estimate Intrinsic Value (Buffett)
+    4. Apply Market Signals (Soros)
+    5. Generate Concession Strategy (Brodow)
+    6. Generate LLM Dialogue (Voss)
+    7. Evaluate Utility (Kwame)
+    """
     
-    # Store initial LSP offer if available
-    if initial_lsp_offer:
-        memory.add_lsp_message(f"Our initial quote for this shipment is ₹{initial_lsp_offer}/km.", initial_lsp_offer)
-        
-    anchor = calculate_anchor(target_price, market_benchmark)
+    # Initialize Modules
+    pricing_model = IntrinsicValueModel()
+    utility_evaluator = UtilityEvaluator()
+    market_monitor = MarketSignalMonitor()
+    rag_service = SimpleRAGService()
     
+    shipper = NegotiationAgent(role="SHIPPER")
+    carrier = NegotiationAgent(role="CARRIER")
+
+    # Step 1 & 2: Load Context & RAG
+    shipment = context.get("shipment", {})
+    route = f"{shipment.get('origin')}-{shipment.get('destination')}"
+    distance = shipment.get('distance', 1000)
+    
+    benchmarks = rag_service.retrieve_market_benchmark(route, distance)
+    market_avg = benchmarks["expected_market_price"]
+    
+    # Step 3: Intrinsic Value (Fair Price)
+    intrinsic_value = pricing_model.estimate(distance)
+    
+    # Step 4: Market Signals
+    market_monitor.update_signals(context.get("market_signals", {}))
+    adjusted_intrinsic = market_monitor.apply_to_price(intrinsic_value)
+    
+    history = []
     rounds_data = []
-    final_status = ""
+    final_status = "IN_PROGRESS"
     agreed_price = None
     
+    # Initial State
+    current_carrier_price = context.get("carrier_metrics", {}).get("initial_offer", market_avg * 1.2)
+    current_shipper_price = context.get("shipper_metrics", {}).get("initial_offer", market_avg * 0.8)
+    
+    history.append({
+        "role": "CARRIER", 
+        "content": f"Initial quote for freight transport: ${current_carrier_price}",
+        "price": current_carrier_price
+    })
+
     for current_round in range(1, max_rounds + 1):
-        print(f"--- Round {current_round} ---")
+        # --- Shipper Turn ---
+        # Evaluate Utility before offering
+        shipper_budget = context.get("shipper_metrics", {}).get("budget", market_avg * 1.1)
         
-        # 1. AI Generates response Strategy based on state
-        ai_response_data = master.generate_response(
-            shipment_context=shipment_context,
-            market_benchmark=market_benchmark,
-            target_price=target_price,
-            reservation_price=reservation_price,
-            competitor_prices=competitor_prices,
-            current_round=current_round,
-            max_rounds=max_rounds,
-            memory=memory
-        )
-        
-        if "error" in ai_response_data:
-            return {"status": "error", "message": ai_response_data["error"]}
-            
-        ai_message = ai_response_data.get("message_to_lsp", "")
-        # convert to float defensively
-        try:
-            target_counter = float(ai_response_data.get("target_counter_price", anchor))
-        except:
-            target_counter = anchor
-            
-        memory.add_ai_message(ai_message, target_counter)
-        
-        round_info = {
+        shipper_context = {
+            "shipment": shipment,
+            "market_benchmark": market_avg,
+            "intrinsic_value": adjusted_intrinsic,
+            "target_price": current_shipper_price,
+            "reservation_price": shipper_budget,
             "round": current_round,
-            "strategy": ai_response_data.get("strategy_used"),
-            "reasoning": ai_response_data.get("reasoning"),
-            "ai_message": ai_message,
-            "target_counter": target_counter,
-            "confidence": ai_response_data.get("confidence_score")
+            "max_rounds": max_rounds
         }
         
-        print(f"AI Strategy: {round_info['strategy']}")
-        print(f"AI Message: {ai_message}")
+        shipper_response = shipper.generate_response(shipper_context, history)
+        shipper_price = shipper_response.get("target_counter_price", current_shipper_price)
+        shipper_msg = shipper_response.get("message_to_lsp", "We are reviewing your quote.")
         
-        # 2. LSP Generates counter offer
-        lsp_message = lsp.get_counter_offer(ai_message, current_round)
-        print(f"LSP Response: {lsp_message}")
+        history.append({"role": "SHIPPER", "content": shipper_msg, "price": shipper_price})
         
-        # Try to extract a price from LSP message (very simple regex for demo purposes)
-        # Assuming LSP responds with something like "46" or "₹46" or "46/km"
-        price_match = re.search(r'(?:₹\s*|^|)(\d+(?:\.\d+)?)(?:\s*/km|\s*$)', lsp_message)
-        lsp_price = float(price_match.group(1)) if price_match else initial_lsp_offer
-        
-        memory.add_lsp_message(lsp_message, lsp_price)
-        round_info["lsp_message"] = lsp_message
-        round_info["lsp_price"] = lsp_price
-        
-        rounds_data.append(round_info)
-        
-        # 3. Decision Engine evaluates
-        decision = evaluate_round_outcome(target_counter, lsp_price, reservation_price, current_round, max_rounds)
-        print(f"Decision: {decision['status']} - {decision['reason']}\n")
-        
-        if decision["status"] == "deal_closed":
-            final_status = "Success"
-            agreed_price = lsp_price
-            break
-        elif decision["status"] == "walk_away":
-            final_status = "Walk Away"
-            agreed_price = None
+        # Check Agreement (Kwame Logic)
+        util = utility_evaluator.evaluate(shipper_price, shipper_budget, current_carrier_price)
+        if shipper_price >= current_carrier_price:
+            final_status = "COMPLETED"
+            agreed_price = shipper_price
             break
             
-    if not final_status:
-        final_status = "Max Rounds Reached - No Deal"
+        # --- Carrier Turn ---
+        carrier_min = context.get("carrier_metrics", {}).get("min_price", adjusted_intrinsic * 0.95)
         
-    # Return aggregated data for insight panel
+        carrier_context = {
+            "shipment": shipment,
+            "market_benchmark": market_avg,
+            "intrinsic_value": adjusted_intrinsic,
+            "target_price": current_carrier_price,
+            "reservation_price": carrier_min,
+            "round": current_round,
+            "max_rounds": max_rounds
+        }
+        
+        carrier_response = carrier.generate_response(carrier_context, history)
+        current_carrier_price = carrier_response.get("target_counter_price", current_carrier_price)
+        carrier_msg = carrier_response.get("message_to_lsp", "Evaluating logistics constraints.")
+        
+        history.append({"role": "CARRIER", "content": carrier_msg, "price": current_carrier_price})
+        
+        # Check Agreement
+        if current_carrier_price <= shipper_price:
+            final_status = "COMPLETED"
+            agreed_price = current_carrier_price
+            break
+            
+        rounds_data.append({
+            "round": current_round,
+            "shipper_offer": shipper_price,
+            "carrier_offer": current_carrier_price,
+            "shipper_message": shipper_msg,
+            "carrier_message": carrier_msg,
+            "utilities": utility_evaluator.evaluate(current_carrier_price, shipper_budget, carrier_min)
+        })
+
     return {
-        "final_status": final_status,
+        "status": final_status,
         "agreed_price": agreed_price,
-        "savings_percentage": ((initial_lsp_offer - agreed_price) / initial_lsp_offer * 100) if agreed_price and initial_lsp_offer else 0,
-        "total_rounds": len(rounds_data),
-        "rounds_data": rounds_data
+        "market_context": {
+            "intrinsic_value": adjusted_intrinsic,
+            "market_benchmark": market_avg
+        },
+        "rounds": rounds_data,
+        "history": history
     }

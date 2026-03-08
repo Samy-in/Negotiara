@@ -4,35 +4,93 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-model NegotiationSession {
-  id               String   @id @default(uuid())
-  shipmentContext  String
-  marketBenchmark  Float
-  targetPrice      Float
-  reservationPrice Float
-  competitorPrices Float[]
-  initialLspOffer  Float?
-  maxRounds        Int      @default(4)
-  status           String   @default("active") // active, closed, walk_away
-  agreedPrice      Float?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  
-  messages         Message[]
+enum Role {
+  SHIPPER
+  CARRIER
+  ADMIN
 }
 
-model Message {
+enum NegotiaraStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  WALK_AWAY
+}
+
+model User {
   id        String   @id @default(uuid())
-  sessionId String
-  role      String   // AI or LSP
-  content   String
-  price     Float?
-  strategy  String?
-  reasoning String?
+  name      String
+  email     String   @unique
+  password  String   // Hashed
+  role      Role     @default(SHIPPER)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  session   NegotiationSession @relation(fields: [sessionId], references: [id])
+  shippedNegotiations   Negotiation[] @relation("ShipperNegotiations")
+  carriedNegotiations   Negotiation[] @relation("CarrierNegotiations")
+}
+
+model Shipment {
+  id           String   @id @default(uuid())
+  origin       String
+  destination  String
+  distance     Float?   // Estimated distance in KM
+  cargoType    String
+  weight       Float
+  deadline     DateTime
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  negotiations Negotiation[]
+}
+
+model Negotiation {
+  id              String          @id @default(uuid())
+  shipmentId      String
+  shipperId       String
+  carrierId       String?         // Optional initially (RFQ stage)
+  status          NegotiaraStatus @default(OPEN)
+  
+  // Pricing & Budget Boundaries
+  basePrice       Float           // Initial starting point
+  targetPrice     Float           // Desired outcome
+  shipperBudget   Float?          // Max walk-away for shipper
+  carrierMinPrice Float?          // Min walk-away for carrier
+  
+  // AI Metrics
+  intrinsicValue  Float?          // Calculated Buffett logic fair price
+  marketBenchmark Float?          // RAG retrieved average
+  
+  deadline        DateTime
+  maxRounds       Int             @default(5)
+  currentRound    Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  shipment        Shipment        @relation(fields: [shipmentId], references: [id])
+  shipper         User            @relation("ShipperNegotiations", fields: [shipperId], references: [id])
+  carrier         User?           @relation("CarrierNegotiations", fields: [carrierId], references: [id])
+  offers          Offer[]
+}
+
+model Offer {
+  id             String      @id @default(uuid())
+  negotiationId  String
+  round          Int
+  price          Float
+  senderId       String      // User ID of the sender
+  
+  // AI & Tactical Data
+  strategy       String?     // AI Strategy used (Voss, Buffett, etc.)
+  reasoning      String?     @db.Text
+  shipperUtility Float?      // Utility score at this point
+  carrierUtility Float?      // Utility score at this point
+  
+  message        String?
+  createdAt      DateTime    @default(now())
+
+  negotiation    Negotiation @relation(fields: [negotiationId], references: [id])
 }
