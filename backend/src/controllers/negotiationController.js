@@ -6,7 +6,7 @@ const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:8000/api/ne
 
 const startNegotiation = async (req, res) => {
     try {
-        const { shipment, shipper_metrics, carrier_metrics, market_signals } = req.body;
+        const { shipment, shipper_metrics, carrier_metrics, market_signals, strategyProfile } = req.body;
         const shipperId = req.user.id;
 
         // 1. Create or Find Shipment
@@ -30,6 +30,9 @@ const startNegotiation = async (req, res) => {
                 basePrice: shipper_metrics.initial_offer,
                 targetPrice: shipper_metrics.target_price || (shipper_metrics.budget * 0.9),
                 shipperBudget: shipper_metrics.budget,
+                strategyProfile: strategyProfile || 'Collaborative',
+                operationalCost: carrier_metrics?.operational_cost || null,
+                desiredMargin: carrier_metrics?.desired_margin || null,
                 deadline: newShipment.deadline,
                 maxRounds: req.body.max_rounds || 5
             }
@@ -41,6 +44,7 @@ const startNegotiation = async (req, res) => {
             shipper_metrics: shipper_metrics,
             carrier_metrics: carrier_metrics,
             market_signals: market_signals,
+            strategy_profile: strategyProfile || 'Collaborative',
             max_rounds: negotiation.maxRounds
         });
 
@@ -111,7 +115,25 @@ const getNegotiationHistory = async (req, res) => {
     }
 };
 
+const getNegotiationById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const negotiation = await prisma.negotiation.findUnique({
+            where: { id },
+            include: {
+                shipment: true,
+                offers: { orderBy: { round: 'asc' } }
+            }
+        });
+        if (!negotiation) return res.status(404).json({ message: 'Not found' });
+        res.json(negotiation);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     startNegotiation,
-    getNegotiationHistory
+    getNegotiationHistory,
+    getNegotiationById
 };

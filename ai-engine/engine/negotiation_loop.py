@@ -71,6 +71,7 @@ def execute_negotiation(context: dict, max_rounds: int = 5) -> dict:
             "shipment": shipment,
             "market_benchmark": market_avg,
             "intrinsic_value": adjusted_intrinsic,
+            "strategy_profile": context.get("strategy_profile", "Collaborative"),
             "target_price": current_shipper_price,
             "reservation_price": shipper_budget,
             "round": current_round,
@@ -91,7 +92,15 @@ def execute_negotiation(context: dict, max_rounds: int = 5) -> dict:
             break
             
         # --- Carrier Turn ---
-        carrier_min = context.get("carrier_metrics", {}).get("min_price", adjusted_intrinsic * 0.95)
+        c_metrics = context.get("carrier_metrics", {})
+        c_op_cost = c_metrics.get("operational_cost")
+        c_margin = c_metrics.get("desired_margin", 0.1) # 10% default
+        
+        # Absolute floor constraint
+        if c_op_cost:
+            carrier_min = c_op_cost * (1 + (c_margin / 100) if c_margin > 1 else 1 + c_margin)
+        else:
+            carrier_min = context.get("carrier_metrics", {}).get("min_price", adjusted_intrinsic * 0.95)
         
         carrier_context = {
             "shipment": shipment,
@@ -99,6 +108,8 @@ def execute_negotiation(context: dict, max_rounds: int = 5) -> dict:
             "intrinsic_value": adjusted_intrinsic,
             "target_price": current_carrier_price,
             "reservation_price": carrier_min,
+            "operational_cost_floor": c_op_cost if c_op_cost else "NOT_PROVIDED_USE_RESERVATION",
+            "desired_profit_margin_percentage": c_margin,
             "round": current_round,
             "max_rounds": max_rounds
         }

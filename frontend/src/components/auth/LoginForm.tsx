@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,7 @@ export function LoginForm() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [mounted, setMounted] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const { user, setUser } = useAuthStore();
     const router = useRouter();
 

@@ -1,10 +1,22 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
 
 export async function fetcher(endpoint: string, options?: RequestInit) {
+    let token = "";
+    if (typeof window !== "undefined") {
+        try {
+            const authStorage = localStorage.getItem("negotiara-auth");
+            if (authStorage) {
+                const parsed = JSON.parse(authStorage);
+                token = parsed.state?.user?.token || "";
+            }
+        } catch (e) { }
+    }
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers: {
             "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
             ...options?.headers,
         },
     })
@@ -23,4 +35,5 @@ export const negotiationApi = {
         body: JSON.stringify(data),
     }),
     getSession: (id: string) => fetcher(`/api/negotiation/${id}`),
+    getHistory: () => fetcher("/api/negotiation/history"),
 }

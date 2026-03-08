@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -59,6 +60,9 @@ model Negotiation {
   targetPrice     Float           // Desired outcome
   shipperBudget   Float?          // Max walk-away for shipper
   carrierMinPrice Float?          // Min walk-away for carrier
+  strategyProfile String?         // e.g. "Aggressive", "Collaborative"
+  operationalCost Float?          // Carrier's absolute bottom line cost
+  desiredMargin   Float?          // Carrier's desired profit margin
   
   // AI Metrics
   intrinsicValue  Float?          // Calculated Buffett logic fair price

@@ -3,6 +3,9 @@
 import { SignupForm } from "@/components/auth/SignupForm";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export default function SignupPage() {
     return (
@@ -10,12 +13,19 @@ export default function SignupPage() {
             {/* Decorative background elements */}
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/5 via-transparent to-accent/5 -z-10" />
 
+            <Link href="/" className="absolute top-4 left-4 sm:top-8 sm:left-8 z-10">
+                <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Home
+                </Button>
+            </Link>
+
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-2 mb-4"
             >
-                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/20">N</div>
+                <Image src="/logo.jpg" alt="Negotiara Logo" width={40} height={40} className="object-contain" />
                 <span className="text-2xl font-display font-bold tracking-tight">Negotiara.</span>
             </motion.div>
 

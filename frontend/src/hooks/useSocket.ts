@@ -17,6 +17,7 @@ export function useSocket(sessionId?: string) {
             setConnected(true);
             if (sessionId) {
                 s.emit("join_session", { sessionId });
+                s.emit("start_playback", { sessionId });
             }
         });
 

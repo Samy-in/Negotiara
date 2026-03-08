@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function LandingPage() {
   const [mounted, setMounted] = React.useState(false);
@@ -24,8 +25,8 @@ export default function LandingPage() {
     <div className="flex flex-col min-h-screen">
       {/* Navigation */}
       <nav className="flex items-center justify-between py-6 px-6 md:px-12 lg:px-24">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">N</div>
+        <div className="flex items-center gap-3">
+          <Image src="/logo.jpg" alt="Negotiara Logo" width={36} height={36} className="object-contain" />
           <span className="text-xl font-display font-bold tracking-tight">Negotiara.</span>
         </div>
         <div className="flex items-center gap-6">
@@ -80,9 +81,11 @@ export default function LandingPage() {
                 <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
-            <Button variant="outline" size="lg" className="h-18 px-12 text-xl font-bold rounded-[24px] border-white/40 bg-white/60 backdrop-blur-3xl hover:bg-white/80 transition-all shadow-sm">
-              View Demo
-            </Button>
+            <Link href="/demo">
+              <Button variant="outline" size="lg" className="h-18 px-12 text-xl font-bold rounded-[24px] border-white/40 bg-white/60 backdrop-blur-3xl hover:bg-white/80 transition-all shadow-sm">
+                View Demo
+              </Button>
+            </Link>
           </div>
         </motion.div>
 

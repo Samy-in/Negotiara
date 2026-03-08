@@ -14,6 +14,7 @@ export function SignupForm() {
     const [role, setRole] = useState<"SHIPPER" | "CARRIER">("SHIPPER");
     const [error, setError] = useState("");
     const [mounted, setMounted] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const { user, setUser } = useAuthStore();
     const router = useRouter();
 
@@ -90,14 +91,14 @@ export function SignupForm() {
                         <div className="grid grid-cols-2 gap-4">
                             <button
                                 type="button"
-                                className={`py-3 rounded-xl border transition-all ${role === "SHIPPER" ? "bg-primary text-white border-primary" : "bg-white/50 border-white/20 text-zinc-600 hover:bg-white/80"}`}
+                                className={`py-3 rounded-xl border transition-all font-semibold ${role === "SHIPPER" ? "bg-[var(--negotiara-yellow)] text-black border-yellow-400 shadow-md" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}
                                 onClick={() => setRole("SHIPPER")}
                             >
                                 Shipper
                             </button>
                             <button
                                 type="button"
-                                className={`py-3 rounded-xl border transition-all ${role === "CARRIER" ? "bg-accent text-white border-accent" : "bg-white/50 border-white/20 text-zinc-600 hover:bg-white/80"}`}
+                                className={`py-3 rounded-xl border transition-all font-semibold ${role === "CARRIER" ? "bg-zinc-900 text-white border-zinc-900 shadow-md" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}
                                 onClick={() => setRole("CARRIER")}
                             >
                                 Carrier

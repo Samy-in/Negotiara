@@ -49,9 +49,55 @@ app.use((err, req, res, next) => {
 io.on('connection', (socket) => {
   console.log('A client connected:', socket.id);
 
-  socket.on('join_negotiation', (negotiationId) => {
-    socket.join(negotiationId);
-    console.log(`User joined negotiation: ${negotiationId}`);
+  socket.on('join_session', (data) => {
+    const { sessionId } = data;
+    socket.join(sessionId);
+    console.log(`User joined negotiation session: ${sessionId}`);
+  });
+
+  // Playback the history simulating real-time typing
+  socket.on('start_playback', async (data) => {
+    const { sessionId } = data;
+    const prisma = require('./src/config/db');
+
+    try {
+      // Fetch all offers for this negotiation
+      const offers = await prisma.offer.findMany({
+        where: { negotiationId: sessionId },
+        orderBy: [
+          { round: 'asc' },
+          { createdAt: 'asc' }
+        ]
+      });
+
+      if (!offers || offers.length === 0) return;
+
+      // Stream them out one-by-one with a delay
+      let index = 0;
+      const streamInterval = setInterval(() => {
+        if (index >= offers.length) {
+          clearInterval(streamInterval);
+          // Optional: emit completion
+          io.to(sessionId).emit('negotiation_complete', { status: 'COMPLETED' });
+          return;
+        }
+
+        const offer = offers[index];
+        const payload = {
+          role: offer.senderId === 'ai-carrier-id' ? 'CARRIER' : 'SHIPPER', // simplified check
+          price: offer.price,
+          content: offer.message,
+          strategy: offer.strategy,
+          round: offer.round
+        };
+
+        io.to(sessionId).emit('negotiation_update', payload);
+        index++;
+      }, 3000); // 3-second delay between messages
+
+    } catch (e) {
+      console.error('Error playing back history:', e);
+    }
   });
 
   socket.on('disconnect', () => {

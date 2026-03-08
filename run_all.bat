@@ -6,7 +6,7 @@ echo.
 
 :: Start AI Engine (FastAPI)
 echo [1/3] Starting AI Negotiation Engine (Port 8000)...
-start "Negotiara - AI Engine" cmd /c "cd ai-engine && python app.py"
+start "Negotiara - AI Engine" cmd /c "cd ai-engine && call venv\Scripts\activate.bat && python app.py"
 
 :: Start Backend (Express)
 echo [2/3] Starting Express Backend (Port 4000)...
